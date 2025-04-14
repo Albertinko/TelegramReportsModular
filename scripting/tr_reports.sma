@@ -101,7 +101,7 @@ public SayReport(playerId) {
 	tr_send_format_report_message(playerId, cmdArgs[cmdLen + 1]);
 }
 
-public tr_successful_report(playerId, chatIndex) {
+public tr_successful_message(playerId, chatIndex) {
 	if(is_user_connected(playerId) && chatIndex == 0) {
 		new steamId[MAX_AUTHID_LENGTH];
 		get_user_authid(playerId, steamId, charsmax(steamId));

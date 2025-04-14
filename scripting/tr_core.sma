@@ -41,7 +41,7 @@ enum _:HostData {
 new Host[HostData];
 
 enum _:Forward {
-	SUCCESSFUL_REPORT
+	SUCCESSFUL_MESSAGE
 };
 
 new Forwards[Forward];
@@ -81,7 +81,7 @@ public plugin_init() {
 	formatex(PluginSettings[PHOTO_URL], charsmax(PluginSettings[PHOTO_URL]),
 	"https://image.gametracker.com/images/maps/160x120/cs/%s.jpg", Host[MAPNAME]);
 
-	Forwards[SUCCESSFUL_REPORT] = CreateMultiForward("tr_successful_report", ET_IGNORE, FP_CELL, FP_CELL);
+	Forwards[SUCCESSFUL_MESSAGE] = CreateMultiForward("tr_successful_message", ET_IGNORE, FP_CELL, FP_CELL);
 }
 
 public native_filter_handler(const nativeFunc[], nativeId, trapMode) {
@@ -234,7 +234,7 @@ public TelegramSendMessage(EzHttpRequest:requestId) {
 	playerId = userData[0];
 	chatIndex = userData[1];
 
-	ExecuteForward(Forwards[SUCCESSFUL_REPORT], _, playerId, chatIndex);
+	ExecuteForward(Forwards[SUCCESSFUL_MESSAGE], _, playerId, chatIndex);
 }
 
 public bool:ReadNewSection(INIParser:parser, const section[], bool:invalidTokens, bool:closeBracket) {	

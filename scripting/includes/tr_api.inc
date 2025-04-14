@@ -61,14 +61,14 @@ native tr_send_format_punishment_message(const playerId, const adminId, const du
 native tr_send_format_report_message(const playerId, const reportMessage[]);
 
 /**
- * Called when the report has been successfully sent
+ * Called when the message has been successfully sent
  *
- * @param playerId		ID of the player who sent the report
- * @param chatIndex		Order number of the chat to which the report was sent
+ * @param playerId		ID of the player who sent the message
+ * @param chatIndex		Order number of the chat to which the message was sent
  *
  * @noreturn
  */
-forward tr_successful_report(playerId, chatIndex);
+forward tr_successful_message(playerId, chatIndex);
 
 /**
  * Converting an integer value of minutes to a string of duration
