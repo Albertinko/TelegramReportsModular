@@ -4,8 +4,8 @@
 
 public stock const PLUGIN_NAME[] = "Telegram Reports: Core";
 
-new const DICT_FILE[]	=	"addons/amxmodx/configs/tr_confgis/tr_dictionary.ini";
-new const CFG_FILE[]	=	"addons/amxmodx/configs/tr_confgis/tr_settings.ini";
+new const DICT_FILE[]	=	"addons/amxmodx/configs/tr_configs/tr_dictionary.ini";
+new const CFG_FILE[]	=	"addons/amxmodx/configs/tr_configs/tr_settings.ini";
 
 enum Sections {
 	SECTION_NONE = -1,

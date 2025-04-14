@@ -4,7 +4,7 @@
 
 public stock const PLUGIN_NAME[] = "Telegram Reports: Reports";
 
-new const CFG_FILE[]	=	"addons/amxmodx/configs/tr_confgis/tr_settings.ini";
+new const CFG_FILE[]	=	"addons/amxmodx/configs/tr_configs/tr_settings.ini";
 new const NVAULT_FILE[]	=	"telegram_reports";
 
 enum Sections {
