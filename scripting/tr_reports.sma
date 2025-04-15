@@ -42,7 +42,7 @@ public plugin_init() {
 	register_plugin(PLUGIN_NAME, VERSION, AUTHORS);
 
 	if(!CommandsNum)
-		plugin_pause("ad");
+		pause("ad");
 
 	register_clcmd("say", "SayReport");
 	register_clcmd("say_team", "SayReport");
