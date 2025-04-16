@@ -4,7 +4,7 @@
 
 public stock const PLUGIN_NAME[] = "Telegram Reports: Reports";
 
-new const CFG_FILE[]	=	"addons/amxmodx/configs/tr_configs/tr_settings.ini";
+new const CFG_FILE[]	=	"addons/amxmodx/configs/tr_configs/tr_reports.ini";
 new const NVAULT_FILE[]	=	"telegram_reports";
 
 enum Sections {
@@ -15,10 +15,19 @@ enum Sections {
 new Sections:ParserCurSection;
 
 enum _:Settings {
-	REPORT_DELAY
+	REPORT_DELAY,
+	SEND_PHOTO,
+	PHOTO_URL[MAX_URL_LENGTH]
 };
 
 new PluginSettings[Settings];
+
+enum _:HostData {
+	NAME[64],
+	MAPNAME[64]
+};
+
+new Host[HostData];
 
 new Array:ArrayCommands;
 new CommandsNum;
@@ -27,6 +36,9 @@ new HandlerVault;
 
 public plugin_precache() {
 	is_core_loaded();
+
+	get_mapname(Host[MAPNAME], charsmax(Host[MAPNAME]));
+	bind_pcvar_string(get_cvar_pointer("hostname"), Host[NAME], charsmax(Host[NAME]));
 	
 	ArrayCommands = ArrayCreate(32);
 
@@ -81,8 +93,10 @@ public SayReport(playerId) {
 	if(!cmdFound)
 		return;
 
+	SetGlobalTransTarget(playerId);
+
 	if(cmdArgs[cmdLen + 1] == EOS) {
-		client_print_color(playerId, print_team_red, "%L", playerId, "ERROR_REPORT");
+		client_print_color(playerId, print_team_red, "%l", "ERROR_REPORT");
 		return;
 	}
 
@@ -93,15 +107,37 @@ public SayReport(playerId) {
 	new sysTime = get_systime();
 
 	if(reportDelay && sysTime < reportDelay) {
-		client_print_color(playerId, print_team_red, "%L", playerId,
-		"REPORT_DELAY", MinutesToDurationString((reportDelay - sysTime) / 60));
+		new delayInMinutes = (reportDelay - sysTime) / 60;
+		client_print_color(playerId, print_team_red, "%l", "REPORT_DELAY",
+		delayInMinutes == 0 ? fmt("%l", "LESS_MINUTE") : MinutesToDurationString(delayInMinutes));
 		return;
 	}
 
-	tr_send_format_report_message(playerId, cmdArgs[cmdLen + 1]);
+	SendFormatReportMessage(playerId, cmdArgs[cmdLen + 1]);
 }
 
-public tr_successful_message(playerId, chatIndex) {
+public SendFormatReportMessage(const playerId, const reportMessage[]) {
+	new playerIp[MAX_IP_WITH_PORT_LENGTH], playerSteamId[MAX_AUTHID_LENGTH];
+	get_user_ip(playerId, playerIp, charsmax(playerIp), 1);
+	get_user_authid(playerId, playerSteamId, charsmax(playerSteamId));
+
+	new fmtMessage[MAX_MESSAGE_LENGTH];
+	formatex(fmtMessage, charsmax(fmtMessage), "%L", LANG_SERVER, "REPORT_MESSAGE");
+
+	replace_string(fmtMessage, charsmax(fmtMessage), "$server$", Host[NAME]);
+	replace_string(fmtMessage, charsmax(fmtMessage), "$map$", Host[MAPNAME]);
+	replace_string(fmtMessage, charsmax(fmtMessage), "$player$", fmt("%n", playerId));
+	replace_string(fmtMessage, charsmax(fmtMessage), "$pip$", playerIp);
+	replace_string(fmtMessage, charsmax(fmtMessage), "$psid$", playerSteamId);
+	replace_string(fmtMessage, charsmax(fmtMessage), "$report$", reportMessage);
+
+	if(PluginSettings[SEND_PHOTO])
+		tr_build_request(playerId, fmtMessage, MM_PHOTO, PluginSettings[PHOTO_URL]);
+	else
+		tr_build_request(playerId, fmtMessage, MM_MESSAGE, "");
+}
+
+public tr_successful_message(const playerId, const chatIndex) {
 	if(is_user_connected(playerId) && chatIndex == 0) {
 		new steamId[MAX_AUTHID_LENGTH];
 		get_user_authid(playerId, steamId, charsmax(steamId));
@@ -121,7 +157,7 @@ public bool:ReadNewSection(INIParser:parser, const section[], bool:invalidTokens
 		return false;
 	}
 
-	if(equal(section, "reports")) {
+	if(equal(section, "settings")) {
 		ParserCurSection = SECTION_SETTINGS;
 		return true;
 	}
@@ -141,7 +177,18 @@ public bool:ReadKeyValue(INIParser:parser, const key[], const value[]) {
 					trim(cmd), trim(allCmds);
 					ArrayPushString(ArrayCommands, cmd);
 				}
-			} else if(equal(key, "DELAY")) { PluginSettings[REPORT_DELAY] = str_to_num(value) * 60; }
+			} else if(equal(key, "DELAY")) {
+				PluginSettings[REPORT_DELAY] = str_to_num(value) * 60;
+			} else if(equal(key, "SEND_PHOTO")) {
+				PluginSettings[SEND_PHOTO] = str_to_num(value);
+			} else if(equal(key, "PHOTO_URL")) {
+				if(value[0] != EOS) {
+					formatex(PluginSettings[PHOTO_URL], charsmax(PluginSettings[PHOTO_URL]), value);
+				} else {
+					formatex(PluginSettings[PHOTO_URL], charsmax(PluginSettings[PHOTO_URL]),
+					"https://image.gametracker.com/images/maps/160x120/cs/%s.jpg", Host[MAPNAME]);
+				}
+			}
 		}
 	}
 

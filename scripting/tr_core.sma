@@ -4,8 +4,10 @@
 
 public stock const PLUGIN_NAME[] = "Telegram Reports: Core";
 
+new const API_URL[] = "https://api.github.com/repos/Albertinko/TelegramReportsModular/releases/latest";
+
 new const DICT_FILE[]	=	"addons/amxmodx/configs/tr_configs/tr_dictionary.ini";
-new const CFG_FILE[]	=	"addons/amxmodx/configs/tr_configs/tr_settings.ini";
+new const CFG_FILE[]	=	"addons/amxmodx/configs/tr_configs/tr_core.ini";
 
 enum Sections {
 	SECTION_NONE = -1,
@@ -17,9 +19,9 @@ enum Sections {
 new Sections:ParserCurSection;
 
 enum _:Settings {
-	SEND_MESSAGE[128],
-	SEND_PHOTO[128],
-	PHOTO_URL[128]
+	SEND_MESSAGE[MAX_URL_LENGTH],
+	SEND_PHOTO[MAX_URL_LENGTH],
+	CHECK_UPDATE
 };
 
 new PluginSettings[Settings];
@@ -33,24 +35,22 @@ enum _:ChatData {
 new Array:ArrayTelegramChats;
 new TelegramChatsNum;
 
-enum _:HostData {
-	NAME[64],
-	MAPNAME[64]
-};
-
-new Host[HostData];
-
 enum _:Forward {
 	SUCCESSFUL_MESSAGE
 };
 
 new Forwards[Forward];
 
+enum _:Semver {
+	MAJOR = 0,
+	MINOR,
+	PATCH
+};
+
 public plugin_natives() {
 	set_native_filter("native_filter_handler");
 
-	register_native("tr_send_format_punishment_message", "_tr_send_format_punishment_message");
-	register_native("tr_send_format_report_message", "_tr_send_format_report_message");
+	register_native("tr_build_request", "native_tr_build_request");
 }
 
 public plugin_precache() {
@@ -74,112 +74,40 @@ public plugin_precache() {
 }
 
 public plugin_init() {
-	get_mapname(Host[MAPNAME], charsmax(Host[MAPNAME]));
-
-	bind_pcvar_string(get_cvar_pointer("hostname"), Host[NAME], charsmax(Host[NAME]));
-
-	formatex(PluginSettings[PHOTO_URL], charsmax(PluginSettings[PHOTO_URL]),
-	"https://image.gametracker.com/images/maps/160x120/cs/%s.jpg", Host[MAPNAME]);
+	if(PluginSettings[CHECK_UPDATE])
+		ezhttp_get(API_URL, "CheckUpdateComplete");
 
 	Forwards[SUCCESSFUL_MESSAGE] = CreateMultiForward("tr_successful_message", ET_IGNORE, FP_CELL, FP_CELL);
 }
 
 public native_filter_handler(const nativeFunc[], nativeId, trapMode) {
-	if(equal(nativeFunc, "tr_send_format_punishment_message"))
-		return PLUGIN_HANDLED;
-
-	if(equal(nativeFunc, "tr_send_format_report_message"))
+	if(equal(nativeFunc, "tr_build_request"))
 		return PLUGIN_HANDLED;
 
 	return PLUGIN_CONTINUE;
 }
 
-public _tr_send_format_punishment_message() {
+public native_tr_build_request() {
 	enum {
 		arg_playerid = 1,
-		arg_adminid,
-		arg_duration,
-		arg_reason,
-		arg_punishment
+		arg_message,
+		arg_urlmethod,
+		arg_photourl
 	};
 
-	new reason[64], punishment[32];
-	get_string(arg_reason, reason, charsmax(reason));
-	get_string(arg_punishment, punishment, charsmax(punishment));
-
-	SendFormatPunishmentMessage(
-		.playerId = get_param(arg_playerid),
-		.adminId = get_param(arg_adminid),
-		.duration = get_param(arg_duration),
-		.reason = reason,
-		.punishment = punishment
-	);
-}
-
-public _tr_send_format_report_message() {
-	enum {
-		arg_playerid = 1,
-		arg_report
-	};
-
-	new reportMessage[192];
-	get_string(arg_report, reportMessage, charsmax(reportMessage));
-
-	SendFormatReportMessage(
-		.playerId = get_param(arg_playerid),
-		.reportMessage = reportMessage
-	);
-}
-
-public SendFormatPunishmentMessage(const playerId, const adminId, const duration, const reason[], const punishment[]) {
-	new playerIp[MAX_IP_WITH_PORT_LENGTH], adminIp[MAX_IP_WITH_PORT_LENGTH];
-	get_user_ip(playerId, playerIp, charsmax(playerIp), 1);
-	get_user_ip(adminId, adminIp, charsmax(adminIp), 1);
-
-	new playerSteamId[MAX_AUTHID_LENGTH], adminSteamId[MAX_AUTHID_LENGTH];
-	get_user_authid(playerId, playerSteamId, charsmax(playerSteamId));
-	get_user_authid(adminId, adminSteamId, charsmax(adminSteamId));
-
-	SetGlobalTransTarget(LANG_SERVER);
+	new playerId = get_param(arg_playerid);
 	
-	new fmtMessage[1024];
-	formatex(fmtMessage, charsmax(fmtMessage), "%l", "BAN_MUTE_MESSAGE");
+	new message[MAX_MESSAGE_LENGTH], photoUrl[MAX_URL_LENGTH];
+	get_string(arg_message, message, charsmax(message));
+	get_string(arg_photourl, photoUrl, charsmax(photoUrl));
 
-	replace_string(fmtMessage, charsmax(fmtMessage), "$server$", Host[NAME]);
-	replace_string(fmtMessage, charsmax(fmtMessage), "$map$", Host[MAPNAME]);
-	replace_string(fmtMessage, charsmax(fmtMessage), "$player$", fmt("%n", playerId));
-	replace_string(fmtMessage, charsmax(fmtMessage), "$admin$", fmt("%n", adminId));
-	replace_string(fmtMessage, charsmax(fmtMessage), "$pip$", playerIp);
-	replace_string(fmtMessage, charsmax(fmtMessage), "$aip$", adminIp);
-	replace_string(fmtMessage, charsmax(fmtMessage), "$psid$", playerSteamId);
-	replace_string(fmtMessage, charsmax(fmtMessage), "$asid$", adminSteamId);
-	replace_string(fmtMessage, charsmax(fmtMessage), "$punish$", fmt("%l", punishment));
-	replace_string(fmtMessage, charsmax(fmtMessage), "$reason$", reason);
-	replace_string(fmtMessage, charsmax(fmtMessage), "$duration$",
-	(duration == 0) ? fmt("%l", "TIME_PERMANENT") : MinutesToDurationString(duration));
-
-	BuildRequest(0, fmtMessage, PluginSettings[SEND_PHOTO], PluginSettings[PHOTO_URL]);
+	if(get_param(arg_urlmethod) == MM_MESSAGE)
+		BuildRequest(playerId, message, PluginSettings[SEND_MESSAGE], "");
+	else
+		BuildRequest(playerId, message, PluginSettings[SEND_PHOTO], photoUrl);
 }
 
-public SendFormatReportMessage(const playerId, const reportMessage[]) {
-	new playerIp[MAX_IP_WITH_PORT_LENGTH], playerSteamId[MAX_AUTHID_LENGTH];
-	get_user_ip(playerId, playerIp, charsmax(playerIp), 1);
-	get_user_authid(playerId, playerSteamId, charsmax(playerSteamId));
-	
-	new fmtMessage[1024];
-	formatex(fmtMessage, charsmax(fmtMessage), "%L", LANG_SERVER, "REPORT_MESSAGE");
-
-	replace_string(fmtMessage, charsmax(fmtMessage), "$server$", Host[NAME]);
-	replace_string(fmtMessage, charsmax(fmtMessage), "$map$", Host[MAPNAME]);
-	replace_string(fmtMessage, charsmax(fmtMessage), "$player$", fmt("%n", playerId));
-	replace_string(fmtMessage, charsmax(fmtMessage), "$pip$", playerIp);
-	replace_string(fmtMessage, charsmax(fmtMessage), "$psid$", playerSteamId);
-	replace_string(fmtMessage, charsmax(fmtMessage), "$report$", reportMessage);
-
-	BuildRequest(playerId, fmtMessage, PluginSettings[SEND_MESSAGE], "");
-}
-
-public BuildRequest(const playerId, const text[], const url[], const photoUrl[]) {
+public BuildRequest(const playerId, const message[], const urlMethod[], const photoUrl[]) {
 	for(new chatIndex, data[ChatData]; chatIndex < TelegramChatsNum; chatIndex++) {
 		ArrayGetArray(ArrayTelegramChats, chatIndex, data);
 
@@ -193,12 +121,12 @@ public BuildRequest(const playerId, const text[], const url[], const photoUrl[])
 
 		if(photoUrl[0] != EOS) {
 			ezjson_object_set_string(object, "photo", photoUrl);
-			ezjson_object_set_string(object, "caption", text);
+			ezjson_object_set_string(object, "caption", message);
 
 			if(data[PUNISHMENT_THREAD_ID] > INVALID_HANDLE)
 				ezjson_object_set_number(object, "message_thread_id", data[PUNISHMENT_THREAD_ID]);
 		} else {
-			ezjson_object_set_string(object, "text", text);
+			ezjson_object_set_string(object, "text", message);
 
 			if(data[REPORT_THREAD_ID] > INVALID_HANDLE)
 				ezjson_object_set_number(object, "message_thread_id", data[REPORT_THREAD_ID]);
@@ -217,11 +145,11 @@ public BuildRequest(const playerId, const text[], const url[], const photoUrl[])
 			ezhttp_option_set_user_data(options, userData, sizeof(userData));
 		}
 
-		ezhttp_post(url, "TelegramSendMessage", options);
+		ezhttp_post(urlMethod, "TelegramMessageComplete", options);
 	}
 }
 
-public TelegramSendMessage(EzHttpRequest:requestId) {
+public TelegramMessageComplete(EzHttpRequest:requestId) {
 	if(ezhttp_get_error_code(requestId) != EZH_OK) {
 		new error[64];
 		ezhttp_get_error_message(requestId, error, charsmax(error));
@@ -243,7 +171,7 @@ public bool:ReadNewSection(INIParser:parser, const section[], bool:invalidTokens
 		return false;
 	}
 
-	if(equal(section, "core")) {
+	if(equal(section, "settings")) {
 		ParserCurSection = SECTION_SETTINGS;
 		return true;
 	}
@@ -286,16 +214,18 @@ public bool:ReadKeyValue(INIParser:parser, const key[], const value[]) {
 
 					ArrayPushArray(ArrayTelegramChats, data);
 				}
+			} else if (equal(key, "CHECK_UPDATE")) {
+				PluginSettings[CHECK_UPDATE] = str_to_num(value);
 			}
 		}
 		case SECTION_LANG_EN: {
-			new fmtMessage[1024];
+			new fmtMessage[MAX_MESSAGE_LENGTH];
 			copy(fmtMessage, charsmax(fmtMessage), value);
 			ReplaceSpecChars(fmtMessage, charsmax(fmtMessage));
 			AddTranslation("en", TransKey:CreateLangKey(key), fmtMessage);
 		}
 		case SECTION_LANG_RU: {
-			new fmtMessage[1024];
+			new fmtMessage[MAX_MESSAGE_LENGTH];
 			copy(fmtMessage, charsmax(fmtMessage), value);
 			ReplaceSpecChars(fmtMessage, charsmax(fmtMessage));
 			AddTranslation("ru", TransKey:CreateLangKey(key), fmtMessage);
@@ -303,6 +233,57 @@ public bool:ReadKeyValue(INIParser:parser, const key[], const value[]) {
 	}
 
 	return true;
+}
+
+public CheckUpdateComplete(EzHttpRequest:requestId) {
+	if(ezhttp_get_error_code(requestId) != EZH_OK) {
+		new error[64];
+		ezhttp_get_error_message(requestId, error, charsmax(error));
+		set_fail_state("%s", error);
+		return;
+	}
+
+	new EzJSON:requestHandle = ezhttp_parse_json_response(requestId);
+
+	if(requestHandle == EzInvalid_JSON)
+		return;
+
+	new buffer[128];
+	ezjson_object_get_string(requestHandle, "tag_name", buffer, charsmax(buffer));
+
+	if(CompareVersion(buffer, VERSION) == 1)
+		log_amx("%L", LANG_SERVER, "UPDATE_AVAILABLE");
+
+	ezjson_free(requestHandle);
+}
+
+stock CompareVersion(const ver1[], const ver2[]) {
+	new version[2][Semver];
+	ParseVersion(ver1, version[0]);
+	ParseVersion(ver2, version[1]);
+
+	for (new i; i < Semver; i++) {
+		if (version[0][i] > version[1][i]) return 1;
+		if (version[0][i] < version[1][i]) return -1;
+	}
+
+	return 0;
+}
+
+stock ParseVersion(const version[], semver[Semver]) {
+	new tempVersion[32];
+	
+	if(version[0] == 'v' || version[0] == 'V')
+		copy(tempVersion, charsmax(tempVersion), version[1]);
+	else
+		copy(tempVersion, charsmax(tempVersion), version);
+
+	new tokens[3][8];
+	explode_string(tempVersion, ".", tokens, sizeof(tokens), sizeof(tokens[]));
+
+	semver[MAJOR] = str_to_num(tokens[0]);
+	semver[MINOR] = str_to_num(tokens[1]);
+	semver[PATCH] = str_to_num(tokens[2]);
 }
 
 stock ReplaceSpecChars(string[], len) {

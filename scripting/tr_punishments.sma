@@ -3,6 +3,29 @@
 
 public stock const PLUGIN_NAME[] = "Telegram Reports: Punishments";
 
+new const CFG_FILE[] = "addons/amxmodx/configs/tr_configs/tr_punishments.ini";
+
+enum Sections {
+	SECTION_NONE = -1,
+	SECTION_SETTINGS
+};
+
+new Sections:ParserCurSection;
+
+enum _:Settings {
+	SEND_PHOTO,
+	PHOTO_URL[MAX_URL_LENGTH]
+};
+
+new PluginSettings[Settings];
+
+enum _:HostData {
+	NAME[64],
+	MAPNAME[64]
+};
+
+new Host[HostData];
+
 // Fresh Bans
 forward fbans_player_banned_pre_f(
 	const id,
@@ -71,6 +94,14 @@ forward OnCMSGagUserBlockAction(const id, eBlockFunc:iFunc, szData[BlockInfo]);
 
 public plugin_precache() {
 	is_core_loaded();
+
+	get_mapname(Host[MAPNAME], charsmax(Host[MAPNAME]));
+	bind_pcvar_string(get_cvar_pointer("hostname"), Host[NAME], charsmax(Host[NAME]));
+
+	new INIParser:parser = INI_CreateParser();
+	INI_SetReaders(parser, "ReadKeyValue", "ReadNewSection");
+	INI_ParseFile(parser, CFG_FILE);
+	INI_DestroyParser(parser);
 }
 
 public plugin_init() {
@@ -91,7 +122,7 @@ public fbans_player_banned_pre_f(
 	const szReason[],
 	const bantime
 ) {
-	tr_send_format_punishment_message(
+	SendFormatPunishmentMessage(
 		.playerId = id,
 		.adminId = get_user_index(szAdminName),
 		.duration = bantime,
@@ -102,7 +133,7 @@ public fbans_player_banned_pre_f(
 
 // [fork] Lite Bans
 public user_banned_pre(id, admin_id, ban_minutes, reason[]) {
-	tr_send_format_punishment_message(
+	SendFormatPunishmentMessage(
 		.playerId = id,
 		.adminId = admin_id,
 		.duration = ban_minutes,
@@ -113,7 +144,7 @@ public user_banned_pre(id, admin_id, ban_minutes, reason[]) {
 
 // AMXBans RBS
 public amxbans_ban_pre(id, admin, bantime, bantype[], banreason[]) {
-	tr_send_format_punishment_message(
+	SendFormatPunishmentMessage(
 		.playerId = id,
 		.adminId = admin,
 		.duration = bantime,
@@ -136,7 +167,7 @@ public CA_gag_setted(
 	gag_flags_s:flags,
 	expireAt
 ) {
-	tr_send_format_punishment_message(
+	SendFormatPunishmentMessage(
 		.playerId = target,
 		.adminId = get_user_index(adminName),
 		.duration = (iTime == 0) ? 0 : (iTime / 60),
@@ -147,7 +178,7 @@ public CA_gag_setted(
 
 // Ultimate GAG
 public gag_gaged(id, player, flags, unixtime, reason[]) {
-	tr_send_format_punishment_message(
+	SendFormatPunishmentMessage(
 		.playerId = player,
 		.adminId = id,
 		.duration = (unixtime == 0) ? 0 : ((unixtime - get_systime()) / 60),
@@ -159,11 +190,83 @@ public gag_gaged(id, player, flags, unixtime, reason[]) {
 // GameCMS GagManager
 public OnCMSGagUserBlockAction(const id, eBlockFunc:iFunc, szData[BlockInfo]) {
 	if(iFunc == eBlockFunc:BLOCK_FUNC_ADD)
-		tr_send_format_punishment_message(
+		SendFormatPunishmentMessage(
 			.playerId = id,
 			.adminId = szData[GAdminId],
 			.duration = szData[GBlockTime],
 			.reason = szData[GBlockReason],
 			.punishment = "MUTE"
 		);
+}
+
+public SendFormatPunishmentMessage(const playerId, const adminId, const duration, const reason[], const punishment[]) {
+	new playerIp[MAX_IP_WITH_PORT_LENGTH], adminIp[MAX_IP_WITH_PORT_LENGTH];
+	get_user_ip(playerId, playerIp, charsmax(playerIp), 1);
+	get_user_ip(adminId, adminIp, charsmax(adminIp), 1);
+
+	new playerSteamId[MAX_AUTHID_LENGTH], adminSteamId[MAX_AUTHID_LENGTH];
+	get_user_authid(playerId, playerSteamId, charsmax(playerSteamId));
+	get_user_authid(adminId, adminSteamId, charsmax(adminSteamId));
+
+	SetGlobalTransTarget(LANG_SERVER);
+	
+	if(adminSteamId[0] == EOS) {
+		formatex(adminSteamId, charsmax(adminSteamId), "%l", "SERVER");
+		formatex(adminIp, charsmax(adminIp), "%l", "SERVER");
+	}
+	
+	new fmtMessage[MAX_MESSAGE_LENGTH];
+	formatex(fmtMessage, charsmax(fmtMessage), "%l", "BAN_MUTE_MESSAGE");
+
+	replace_string(fmtMessage, charsmax(fmtMessage), "$server$", Host[NAME]);
+	replace_string(fmtMessage, charsmax(fmtMessage), "$map$", Host[MAPNAME]);
+	replace_string(fmtMessage, charsmax(fmtMessage), "$player$", fmt("%n", playerId));
+	replace_string(fmtMessage, charsmax(fmtMessage), "$admin$", fmt("%n", adminId));
+	replace_string(fmtMessage, charsmax(fmtMessage), "$pip$", playerIp);
+	replace_string(fmtMessage, charsmax(fmtMessage), "$aip$", adminIp);
+	replace_string(fmtMessage, charsmax(fmtMessage), "$psid$", playerSteamId);
+	replace_string(fmtMessage, charsmax(fmtMessage), "$asid$", adminSteamId);
+	replace_string(fmtMessage, charsmax(fmtMessage), "$punish$", fmt("%l", punishment));
+	replace_string(fmtMessage, charsmax(fmtMessage), "$reason$", reason);
+	replace_string(fmtMessage, charsmax(fmtMessage), "$duration$",
+	(duration == 0) ? fmt("%l", "TIME_PERMANENT") : MinutesToDurationString(duration));
+
+	if(PluginSettings[SEND_PHOTO])
+		tr_build_request(0, fmtMessage, MM_PHOTO, PluginSettings[PHOTO_URL]);
+	else
+		tr_build_request(0, fmtMessage, MM_MESSAGE, "");
+}
+
+public bool:ReadNewSection(INIParser:parser, const section[], bool:invalidTokens, bool:closeBracket) {	
+	if(!closeBracket) {
+		log_amx("Closing bracket was not detected! Current section name '%s'.", section);
+		return false;
+	}
+
+	if(equal(section, "settings")) {
+		ParserCurSection = SECTION_SETTINGS;
+		return true;
+	}
+
+	return false;
+}
+
+public bool:ReadKeyValue(INIParser:parser, const key[], const value[]) {
+	switch(ParserCurSection) {
+		case SECTION_NONE: { return false; }
+		case SECTION_SETTINGS: {
+			if(equal(key, "SEND_PHOTO")) {
+				PluginSettings[SEND_PHOTO] = str_to_num(value);
+			} else if(equal(key, "PHOTO_URL")) {
+				if(value[0] != EOS) {
+					formatex(PluginSettings[PHOTO_URL], charsmax(PluginSettings[PHOTO_URL]), value);
+				} else {
+					formatex(PluginSettings[PHOTO_URL], charsmax(PluginSettings[PHOTO_URL]),
+					"https://image.gametracker.com/images/maps/160x120/cs/%s.jpg", Host[MAPNAME]);
+				}
+			}
+		}
+	}
+
+	return true;
 }
