@@ -1,9 +1,15 @@
+////////////////////////////////    HEADER    ////////////////////////////////
+
 #include <amxmodx>
 #include <tr_api>
 
-public stock const PLUGIN_NAME[] = "Telegram Reports: Punishments";
+#define PLUGIN_NAME	"Telegram Reports: Punishments"
 
-new const CFG_FILE[] = "addons/amxmodx/configs/tr_configs/tr_punishments.ini";
+////////////////////////////////    CONSTANTS    ////////////////////////////////
+
+#define CFG_FILE	"addons/amxmodx/configs/tr_configs/tr_punishments.ini"
+
+////////////////////////////////    GLOBAL VARIABLES    ////////////////////////////////
 
 enum Sections {
 	SECTION_NONE = -1,
@@ -26,6 +32,8 @@ enum _:HostData {
 
 new Host[HostData];
 
+////////////////////////////////    CONFIGURATION    ////////////////////////////////
+
 // Fresh Bans
 forward fbans_player_banned_pre_f(
 	const id,
@@ -42,7 +50,9 @@ forward fbans_player_banned_pre_f(
 );
 
 // [fork] Lite Bans
-forward user_banned_pre(id, admin_id, ban_minutes, reason[]);
+#define LB_MAX_REASON_LENGTH 96
+
+forward user_banned_pre(banned_id, admin_id, ban_minutes, const ban_reason[LB_MAX_REASON_LENGTH]);
 
 // AMXBans RBS
 forward amxbans_ban_pre(id, admin, bantime, bantype[], banreason[]);
@@ -66,7 +76,7 @@ forward CA_gag_setted(
 forward gag_gaged(id, player, flags, unixtime, reason[]);
 
 // GameCMS GagManager
-#define MAX_REASON_LENGTH 100
+#define GM_MAX_REASON_LENGTH 100
 
 enum _:BlockInfo {
 	GBid,
@@ -77,7 +87,7 @@ enum _:BlockInfo {
 	GBlockTime,
 	GAuthId[MAX_AUTHID_LENGTH],
 	GName[MAX_NAME_LENGTH],
-	GBlockReason[MAX_REASON_LENGTH],
+	GBlockReason[GM_MAX_REASON_LENGTH],
 	GAdminNick[MAX_NAME_LENGTH],
 	GModifiedBy[MAX_NAME_LENGTH],
 	bool:GModifiedBlocked,
@@ -93,20 +103,61 @@ enum _:eBlockFunc {
 forward OnCMSGagUserBlockAction(const id, eBlockFunc:iFunc, szData[BlockInfo]);
 
 public plugin_precache() {
-	is_core_loaded();
+	if(!is_core_loaded())
+		return;
 
 	get_mapname(Host[MAPNAME], charsmax(Host[MAPNAME]));
 	bind_pcvar_string(get_cvar_pointer("hostname"), Host[NAME], charsmax(Host[NAME]));
 
+	ParseConfig();
+}
+
+public ParseConfig() {
 	new INIParser:parser = INI_CreateParser();
 	INI_SetReaders(parser, "ReadKeyValue", "ReadNewSection");
 	INI_ParseFile(parser, CFG_FILE);
 	INI_DestroyParser(parser);
 }
 
-public plugin_init() {
-	register_plugin(PLUGIN_NAME, VERSION, AUTHORS);
+public bool:ReadNewSection(INIParser:parser, const section[], bool:invalidTokens, bool:closeBracket) {	
+	if(!closeBracket) {
+		log_amx("Closing bracket was not detected! Current section name '%s'.", section);
+		return false;
+	}
+
+	if(equal(section, "settings")) {
+		ParserCurSection = SECTION_SETTINGS;
+		return true;
+	}
+
+	return false;
 }
+
+public bool:ReadKeyValue(INIParser:parser, const key[], const value[]) {
+	switch(ParserCurSection) {
+		case SECTION_NONE: { return false; }
+		case SECTION_SETTINGS: {
+			if(equal(key, "SEND_PHOTO")) {
+				PluginSettings[SEND_PHOTO] = str_to_num(value);
+			} else if(equal(key, "PHOTO_URL")) {
+				if(value[0] != EOS) {
+					formatex(PluginSettings[PHOTO_URL], charsmax(PluginSettings[PHOTO_URL]), value);
+				} else {
+					formatex(PluginSettings[PHOTO_URL], charsmax(PluginSettings[PHOTO_URL]),
+					"https://image.gametracker.com/images/maps/160x120/cs/%s.jpg", Host[MAPNAME]);
+				}
+			}
+		}
+	}
+
+	return true;
+}
+
+public plugin_init() {
+	register_plugin(PLUGIN_NAME, PLUGIN_VERSION, PLUGIN_AUTHORS);
+}
+
+////////////////////////////////    MAIN FUNCTIONS    ////////////////////////////////
 
 // Fresh Bans
 public fbans_player_banned_pre_f(
@@ -132,12 +183,12 @@ public fbans_player_banned_pre_f(
 }
 
 // [fork] Lite Bans
-public user_banned_pre(id, admin_id, ban_minutes, reason[]) {
+public user_banned_pre(banned_id, admin_id, ban_minutes, const ban_reason[LB_MAX_REASON_LENGTH]) {
 	SendFormatPunishmentMessage(
-		.playerId = id,
+		.playerId = banned_id,
 		.adminId = admin_id,
 		.duration = ban_minutes,
-		.reason = reason,
+		.reason = ban_reason,
 		.punishment = "BAN"
 	);
 }
@@ -235,38 +286,4 @@ public SendFormatPunishmentMessage(const playerId, const adminId, const duration
 		tr_build_request(0, fmtMessage, MM_PHOTO, PluginSettings[PHOTO_URL]);
 	else
 		tr_build_request(0, fmtMessage, MM_MESSAGE, "");
-}
-
-public bool:ReadNewSection(INIParser:parser, const section[], bool:invalidTokens, bool:closeBracket) {	
-	if(!closeBracket) {
-		log_amx("Closing bracket was not detected! Current section name '%s'.", section);
-		return false;
-	}
-
-	if(equal(section, "settings")) {
-		ParserCurSection = SECTION_SETTINGS;
-		return true;
-	}
-
-	return false;
-}
-
-public bool:ReadKeyValue(INIParser:parser, const key[], const value[]) {
-	switch(ParserCurSection) {
-		case SECTION_NONE: { return false; }
-		case SECTION_SETTINGS: {
-			if(equal(key, "SEND_PHOTO")) {
-				PluginSettings[SEND_PHOTO] = str_to_num(value);
-			} else if(equal(key, "PHOTO_URL")) {
-				if(value[0] != EOS) {
-					formatex(PluginSettings[PHOTO_URL], charsmax(PluginSettings[PHOTO_URL]), value);
-				} else {
-					formatex(PluginSettings[PHOTO_URL], charsmax(PluginSettings[PHOTO_URL]),
-					"https://image.gametracker.com/images/maps/160x120/cs/%s.jpg", Host[MAPNAME]);
-				}
-			}
-		}
-	}
-
-	return true;
 }

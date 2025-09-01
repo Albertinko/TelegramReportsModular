@@ -1,17 +1,17 @@
-////////////////////////////////////
-////////					////////
-////	Telegram Reports API	////
-////////					////////
-////////////////////////////////////
+////////////////////////////////////////////////////////////
+////////////////							////////////////
+////////		TELEGRAM REPORTS MODULAR API		////////
+////////////////							////////////////
+////////////////////////////////////////////////////////////
 
 #if defined _tr_api_included
 	#endinput
 #endif
 #define _tr_api_included
 
-public stock const VERSION[]	=	"5.0.0";
-public stock const AUTHORS[]	=	"DEV-CS.RU Community";
-public stock const SOURCE[]		=	"https://github.com/Albertinko/TelegramReportsModular";
+#define PLUGIN_VERSION	"5.1.0"
+#define PLUGIN_AUTHORS	"HLDS.RUN Community"
+#define PLUGIN_SOURCE	"https://github.com/Albertinko/TelegramReportsModular"
 
 /**
  * Maximum buffer size required to store the message text
@@ -123,9 +123,13 @@ stock any:MinutesToDurationString(minutes) {
 /**
  * Checks whether the core plugin is loaded. In case of failure, it will stop the plugin.
  *
- * @return		true - if loaded or false - if otherwise
+ * @return				true - if loaded or false - if otherwise
  */
 stock bool:is_core_loaded() {
-	if(is_plugin_loaded("Telegram Reports: Core") == INVALID_PLUGIN_ID)
+	if(is_plugin_loaded("Telegram Reports: Core") == INVALID_PLUGIN_ID) {
 		set_fail_state("The core plugin is not loaded!");
+		return false;
+	}
+
+	return true;
 }
