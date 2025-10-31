@@ -7,6 +7,7 @@
 
 ////////////////////////////////    CONSTANTS    ////////////////////////////////
 
+// The path to the configuration file
 #define CFG_FILE	"addons/amxmodx/configs/tr_configs/tr_punishments.ini"
 
 ////////////////////////////////    GLOBAL VARIABLES    ////////////////////////////////
@@ -52,7 +53,12 @@ forward fbans_player_banned_pre_f(
 // [fork] Lite Bans
 #define LB_MAX_REASON_LENGTH 96
 
-forward user_banned_pre(banned_id, admin_id, ban_minutes, const ban_reason[LB_MAX_REASON_LENGTH]);
+forward user_banned_pre(
+	banned_id,
+	admin_id,
+	ban_minutes,
+	const ban_reason[LB_MAX_REASON_LENGTH]
+);
 
 // AMXBans RBS
 forward amxbans_ban_pre(id, admin, bantime, bantype[], banreason[]);
@@ -135,7 +141,9 @@ public bool:ReadNewSection(INIParser:parser, const section[], bool:invalidTokens
 
 public bool:ReadKeyValue(INIParser:parser, const key[], const value[]) {
 	switch(ParserCurSection) {
-		case SECTION_NONE: { return false; }
+		case SECTION_NONE: {
+			return false;
+		}
 		case SECTION_SETTINGS: {
 			if(equal(key, "SEND_PHOTO")) {
 				PluginSettings[SEND_PHOTO] = str_to_num(value);
@@ -162,28 +170,33 @@ public plugin_init() {
 // Fresh Bans
 public fbans_player_banned_pre_f(
 	const id,
-	const userid,
-	const szSteamID[],
-	const szIp[],
-	const szName[],
-	const szAdminIp[],
-	const szAdminSteamID[],
-	const szAdminName[],
+	const uid,
+	const player_steamid[],
+	const player_ip[],
+	const player_name[],
+	const admin_ip[],
+	const admin_steamid[],
+	const admin_name[],
 	const ban_type[],
-	const szReason[],
+	const ban_reason[],
 	const bantime
 ) {
 	SendFormatPunishmentMessage(
 		.playerId = id,
-		.adminId = get_user_index(szAdminName),
+		.adminId = get_user_index(admin_name),
 		.duration = bantime,
-		.reason = szReason,
+		.reason = ban_reason,
 		.punishment = "BAN"
 	);
 }
 
 // [fork] Lite Bans
-public user_banned_pre(banned_id, admin_id, ban_minutes, const ban_reason[LB_MAX_REASON_LENGTH]) {
+public user_banned_pre(
+	banned_id,
+	admin_id,
+	ban_minutes,
+	const ban_reason[LB_MAX_REASON_LENGTH]
+) {
 	SendFormatPunishmentMessage(
 		.playerId = banned_id,
 		.adminId = admin_id,
@@ -207,22 +220,22 @@ public amxbans_ban_pre(id, admin, bantime, bantype[], banreason[]) {
 // Chat Additions: Gag
 public CA_gag_setted(
 	const target,
-	szName[],
+	name[],
 	authID[],
 	IP[],
 	adminName[],
 	adminAuthID[],
 	adminIP[],
-	szReason[],
-	iTime,
+	reason[],
+	time,
 	gag_flags_s:flags,
 	expireAt
 ) {
 	SendFormatPunishmentMessage(
 		.playerId = target,
 		.adminId = get_user_index(adminName),
-		.duration = (iTime == 0) ? 0 : (iTime / 60),
-		.reason = szReason,
+		.duration = (time == 0) ? 0 : (time / 60),
+		.reason = reason,
 		.punishment = "MUTE"
 	);
 }
@@ -240,14 +253,16 @@ public gag_gaged(id, player, flags, unixtime, reason[]) {
 
 // GameCMS GagManager
 public OnCMSGagUserBlockAction(const id, eBlockFunc:iFunc, szData[BlockInfo]) {
-	if(iFunc == eBlockFunc:BLOCK_FUNC_ADD)
-		SendFormatPunishmentMessage(
-			.playerId = id,
-			.adminId = szData[GAdminId],
-			.duration = szData[GBlockTime],
-			.reason = szData[GBlockReason],
-			.punishment = "MUTE"
-		);
+	if(iFunc != eBlockFunc:BLOCK_FUNC_ADD)
+		return;
+
+	SendFormatPunishmentMessage(
+		.playerId = id,
+		.adminId = get_user_index(szData[GAdminNick]),
+		.duration = szData[GBlockTime],
+		.reason = szData[GBlockReason],
+		.punishment = "MUTE"
+	);
 }
 
 public SendFormatPunishmentMessage(const playerId, const adminId, const duration, const reason[], const punishment[]) {
@@ -282,8 +297,9 @@ public SendFormatPunishmentMessage(const playerId, const adminId, const duration
 	replace_string(fmtMessage, charsmax(fmtMessage), "$duration$",
 	(duration == 0) ? fmt("%l", "TIME_PERMANENT") : MinutesToDurationString(duration));
 
-	if(PluginSettings[SEND_PHOTO])
+	if(PluginSettings[SEND_PHOTO]) {
 		tr_build_request(0, fmtMessage, MM_PHOTO, PluginSettings[PHOTO_URL]);
-	else
-		tr_build_request(0, fmtMessage, MM_MESSAGE, "");
+	} else {
+		tr_build_request(0, fmtMessage, MM_MESSAGE);
+	}
 }

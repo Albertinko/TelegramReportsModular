@@ -8,9 +8,13 @@
 
 ////////////////////////////////    CONSTANTS    ////////////////////////////////
 
+// URL to the GitHub repository to check for available updates
 #define API_URL	"https://api.github.com/repos/Albertinko/TelegramReportsModular/releases/latest"
 
+// The path to the dictionary file
 #define DICT_FILE	"addons/amxmodx/configs/tr_configs/tr_dictionary.ini"
+
+// The path to the configuration file
 #define CFG_FILE	"addons/amxmodx/configs/tr_configs/tr_core.ini"
 
 ////////////////////////////////    GLOBAL VARIABLES    ////////////////////////////////
@@ -85,14 +89,17 @@ public native_tr_build_request() {
 
 	new playerId = get_param(arg_playerid);
 	
-	new message[MAX_MESSAGE_LENGTH], photoUrl[MAX_URL_LENGTH];
+	new message[MAX_MESSAGE_LENGTH];
 	get_string(arg_message, message, charsmax(message));
-	get_string(arg_photourl, photoUrl, charsmax(photoUrl));
 
-	if(get_param(arg_urlmethod) == MM_MESSAGE)
-		BuildRequest(playerId, message, PluginSettings[SEND_MESSAGE], "");
-	else
+	if(get_param(arg_urlmethod) == MM_MESSAGE) {
+		BuildRequest(playerId, message, PluginSettings[SEND_MESSAGE], NULL_STRING);
+	} else {
+		new photoUrl[MAX_URL_LENGTH];
+		get_string(arg_photourl, photoUrl, charsmax(photoUrl));
+
 		BuildRequest(playerId, message, PluginSettings[SEND_PHOTO], photoUrl);
+	}
 }
 
 public plugin_precache() {
@@ -140,7 +147,9 @@ public bool:ReadNewSection(INIParser:parser, const section[], bool:invalidTokens
 
 public bool:ReadKeyValue(INIParser:parser, const key[], const value[]) {
 	switch(ParserCurSection) {
-		case SECTION_NONE: { return false; }
+		case SECTION_NONE: {
+			return false;
+		}
 		case SECTION_SETTINGS: {
 			if(equal(key, "BOT_TOKEN")) {
 				formatex(PluginSettings[SEND_MESSAGE], charsmax(PluginSettings[SEND_MESSAGE]), "https://api.telegram.org/bot%s/sendMessage?", value);
@@ -154,7 +163,6 @@ public bool:ReadKeyValue(INIParser:parser, const key[], const value[]) {
 					strtok(tgChat, data[CHAT_ID], charsmax(data[CHAT_ID]), msgThread[0], charsmax(msgThread[]), ':');
 
 					if(msgThread[0][0] != EOS) {
-						trim(tgChat);
 						strtok(msgThread[0], msgThread[0], charsmax(msgThread[]), msgThread[1], charsmax(msgThread[]), ':');
 						data[PUNISHMENT_THREAD_ID] = str_to_num(msgThread[0]);
 						data[REPORT_THREAD_ID] = str_to_num(msgThread[1]);
@@ -165,7 +173,7 @@ public bool:ReadKeyValue(INIParser:parser, const key[], const value[]) {
 
 					ArrayPushArray(ArrayTelegramChats, data);
 				}
-			} else if (equal(key, "CHECK_UPDATE")) {
+			} else if(equal(key, "CHECK_UPDATE")) {
 				PluginSettings[CHECK_UPDATE] = str_to_num(value);
 			}
 		}
@@ -292,10 +300,11 @@ stock CompareVersion(const ver1[], const ver2[]) {
 stock ParseVersion(const version[], semver[Semver]) {
 	new tempVersion[32];
 	
-	if(version[0] == 'v' || version[0] == 'V')
+	if(version[0] == 'v' || version[0] == 'V') {
 		copy(tempVersion, charsmax(tempVersion), version[1]);
-	else
+	} else {
 		copy(tempVersion, charsmax(tempVersion), version);
+	}
 
 	new tokens[3][8];
 	explode_string(tempVersion, ".", tokens, sizeof(tokens), sizeof(tokens[]));

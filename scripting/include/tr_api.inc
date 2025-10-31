@@ -9,7 +9,7 @@
 #endif
 #define _tr_api_included
 
-#define PLUGIN_VERSION	"5.1.0"
+#define PLUGIN_VERSION	"5.2.0"
 #define PLUGIN_AUTHORS	"HLDS.RUN Community"
 #define PLUGIN_SOURCE	"https://github.com/Albertinko/TelegramReportsModular"
 
@@ -65,7 +65,7 @@ new TimeLang[][] = {
  *
  * @noreturn
  */
-native tr_build_request(const playerId, const message[], const urlMethod, const photoUrl[]);
+native tr_build_request(const playerId, const message[], const urlMethod, const photoUrl[] = "");
 
 /**
  * Called when the message has been successfully sent

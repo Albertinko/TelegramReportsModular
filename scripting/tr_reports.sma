@@ -8,8 +8,10 @@
 
 ////////////////////////////////    CONSTANTS    ////////////////////////////////
 
+// The path to the configuration file
 #define CFG_FILE	"addons/amxmodx/configs/tr_configs/tr_reports.ini"
 
+// The name to the nVault file
 #define NVAULT_FILE	"telegram_reports"
 
 ////////////////////////////////    GLOBAL VARIABLES    ////////////////////////////////
@@ -83,7 +85,9 @@ public bool:ReadNewSection(INIParser:parser, const section[], bool:invalidTokens
 
 public bool:ReadKeyValue(INIParser:parser, const key[], const value[]) {
 	switch(ParserCurSection) {
-		case SECTION_NONE: { return false; }
+		case SECTION_NONE: {
+			return false;
+		}
 		case SECTION_SETTINGS: {
 			if(equal(key, "COMMANDS")) {
 				new cmd[32], allCmds[MAX_FMT_LENGTH];
@@ -191,10 +195,11 @@ public SendFormatReportMessage(const playerId, const reportMessage[]) {
 	replace_string(fmtMessage, charsmax(fmtMessage), "$psid$", playerSteamId);
 	replace_string(fmtMessage, charsmax(fmtMessage), "$report$", reportMessage);
 
-	if(PluginSettings[SEND_PHOTO])
+	if(PluginSettings[SEND_PHOTO]) {
 		tr_build_request(playerId, fmtMessage, MM_PHOTO, PluginSettings[PHOTO_URL]);
-	else
-		tr_build_request(playerId, fmtMessage, MM_MESSAGE, "");
+	} else {
+		tr_build_request(playerId, fmtMessage, MM_MESSAGE);
+	}
 }
 
 public tr_successful_message(const playerId, const chatIndex) {
